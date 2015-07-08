@@ -24,7 +24,7 @@ Local $x = 30, $y = 150
 			GUICtrlSetTip(-1, $txtTip)
 		$cmbBotCommand = GUICtrlCreateCombo("", $x + 20, $y - 3, 90, 25, BitOR($CBS_DROPDOWNLIST, $CBS_AUTOHSCROLL))
 			GUICtrlSetTip(-1, $txtTip)
-			GUICtrlSetData(-1, "Halt Attack|Shutdown PC|Sleep PC", "Halt Attack")
+			GUICtrlSetData(-1, "Halt Attack|Shutdown PC|Sleep PC|Pause Bot", "Halt Attack")
 		$lblBotCond = GUICtrlCreateLabel("When...", $x + 125, $y, 45, 17)
 		$cmbBotCond = GUICtrlCreateCombo("", $x + 175, $y - 3, 160, 25, BitOR($CBS_DROPDOWNLIST, $CBS_AUTOHSCROLL))
 			GUICtrlSetTip(-1, $txtTip)
