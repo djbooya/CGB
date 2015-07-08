@@ -71,6 +71,8 @@ Func BotCommand()
 				$MeetCondStop = True
 				$bTrainEnabled = False
 				$bDonationEnabled = False
+			Case 17
+			    If isDarkElixirFull() Then $MeetCondStop = True
 		EndSwitch
 
 		If $MeetCondStop Then
