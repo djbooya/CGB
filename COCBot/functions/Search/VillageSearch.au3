@@ -106,6 +106,9 @@ Func VillageSearch() ;Control for searching a village that meets conditions
 		$SearchCount = 0
 	EndIf
 
+    ; Open DLL before starting loop to increase performance
+    Local $pFunctionDLL = DllOpen($pFuncLib)
+
 	While 1
 		$bBtnAttackNowPressed = False
 		If $iVSDelay > 0 Then
@@ -113,7 +116,44 @@ Func VillageSearch() ;Control for searching a village that meets conditions
 		EndIf
 
 		If $Restart = True Then Return ; exit func
+
+	    ; Quick Skip on Not Enough Resource Start
+	    ; added this code to leave loop if resource counts don't meet our requirements -- results in faster searches since it doesn't bother opening DLL to scan image
+		$whatResources = ""
+		$EnoughResources = True
 		GetResources() ;Reads Resource Values
+	    If $debugSetlog = 1 Then SetLog(_PadStringCenter($iCmbMeetGE[$iCmbSearchMode] & " Search: " & $iCmbSearchMode & " Gold: " & $searchGold & "/" & $iAimGold[$iCmbSearchMode] & " Elixir: " & $searchElixir & "/" & $iAimElixir[$iCmbSearchMode] & " Dark: " & $searchDark & "/" & $iAimDark[$iCmbSearchMode], 50, "~"), $COLOR_GREEN) ;deleteme
+		; Must Meet Gold And Elixir
+		If $iCmbMeetGE[$iCmbSearchMode] = 0 And (Int($searchGold) < Int($iAimGold[$iCmbSearchMode]) Or Int($searchElixir) < Int($iAimElixir[$iCmbSearchMode])) Then
+		     If (Int($searchGold) < Int($iAimGold[$iCmbSearchMode])) Then $whatResources &= "Gold "
+			 If (Int($searchElixir) < Int($iAimElixir[$iCmbSearchMode])) Then $whatResources &= "Elixir "
+			 $EnoughResources = False
+	    EndIf
+	    ; Must Meet Gold OR Elixir
+		If $iCmbMeetGE[$iCmbSearchMode] = 1 And (Int($searchGold) < Int($iAimGold[$iCmbSearchMode]) And Int($searchElixir) < Int($iAimElixir[$iCmbSearchMode])) Then
+		     $whatResources = "Gold and Elixir"
+			 $EnoughResources = False
+	    EndIf
+	    ; Must Meet Gold + Elixir
+		If $iCmbMeetGE[$iCmbSearchMode] = 2 And ((Int($searchGold) + Int($searchElixir)) < Int($iAimGoldPlusElixir[$iCmbSearchMode])) Then
+		     $whatResources = "Gold PLUS Elixir"
+			 $EnoughResources = False
+	    EndIf
+	    ; Must Meet Dark Elixir
+		If $iChkMeetDE[$iCmbSearchMode] = 1 And Int($searchDark) < Int($iAimDark[$iCmbSearchMode]) Then
+			 $whatResources &= ", Dark Elixir"
+			 $EnoughResources = False
+	    EndIf
+
+	    If $EnoughResources = False Then
+			SetLog(_PadStringCenter("Not Enough " & $whatResources & " Resources, Skipping...", 50, "~"), $COLOR_GREEN) ;deleteme
+		    Click(825, 527,1,0,"#0155") ;Click Next
+		    If _Sleep(500) Then Return
+		    $iSkipped = $iSkipped + 1
+		    GUICtrlSetData($lblresultvillagesskipped, GUICtrlRead($lblresultvillagesskipped) + 1)
+			ContinueLoop
+	    EndIf
+	    ; Quick Skip on Not Enough Resource End
 		If $Restart = True Then Return ; exit func
 		If $iChkAttackNow = 1 Then
 			If _Sleep(1000 * $iAttackNowDelay) Then Return ; add human reaction time on AttackNow button function
@@ -135,23 +175,32 @@ Func VillageSearch() ;Control for searching a village that meets conditions
 			If $iChkWeakBase[$x] = 1 Then
 				_WinAPI_DeleteObject($hBitmapFirst)
 				$hBitmapFirst = _CaptureRegion2()
-				Local $resultHere = DllCall($pFuncLib, "str", "CheckConditionForWeakBase", "ptr", $hBitmapFirst, "int", ($iCmbWeakMortar[$x] + 1), "int", ($iCmbWeakWizTower[$x] + 1), "int", 10)
-				If $resultHere[0] = "Y" Then
+			    If $debugSetlog = 1 Then SetLog(_PadStringCenter(" VillageBase->BeforeDLLCall", 50, "~"), $COLOR_GREEN) ;deleteme
+				Local $resultHere = DllCall($pFunctionDLL, "str", "CheckConditionForWeakBase", "ptr", $hBitmapFirst, "int", ($iCmbWeakMortar[$x] + 1), "int", ($iCmbWeakWizTower[$x] + 1), "int", 10)
+			    If $debugSetlog = 1 Then SetLog(_PadStringCenter(" VillageBase->AfterDLLCall", 50, "~"), $COLOR_GREEN) ;deleteme
+			    If $resultHere[0] = "Y" Then
 					$isWeakBase[$x] = True
 				EndIf
 			EndIf
 		Next
+		If $debugSetlog = 1 Then SetLog(_PadStringCenter(" VillageBase->End For Loop - Search Mode=" & $iCmbSearchMode, 50, "~"), $COLOR_GREEN) ;deleteme
 		If $iCmbSearchMode = 0 Then
+		    ; this is the dead base check
 			$matchDB = CompareResources($DB, $isWeakBase[$DB])
 		ElseIf $iCmbSearchMode = 1 Then
+		    ; this is the live base check
 			$matchLB = CompareResources($LB, $isWeakBase[$LB])
-		Else
-			If IsSearchModeActive($DB) Then $matchDB = CompareResources($DB, $isWeakBase)
-			If IsSearchModeActive($LB) Then $matchLB = CompareResources($LB, $isWeakBase)
+		 Else
+			; this is the
+			If $debugSetlog = 1 Then SetLog(_PadStringCenter(" VillageBase->DB=" & $DB & " LB=" & $LB, 50, "~"), $COLOR_GREEN) ;deleteme
+			If IsSearchModeActive($DB) Then $matchDB = CompareResources($DB, $isWeakBase[$DB])
+			If IsSearchModeActive($LB) Then $matchLB = CompareResources($LB, $isWeakBase[$LB])
 		EndIf
-		If $matchDB Or $matchLB Then
+	    If $debugSetlog = 1 Then SetLog(_PadStringCenter(" VillageBase->matchDB=" & $matchDB & " matchLB=" & $matchLB, 50, "~"), $COLOR_GREEN) ;deleteme
+		;If $matchDB Or $matchLB Then
+			If $debugSetlog = 1 Then SetLog(_PadStringCenter(" VillageBase->checkDeadBase ", 50, "~"), $COLOR_GREEN) ;deleteme
 			$dbBase = checkDeadBase()
-		EndIf
+		;EndIf
 		If $matchDB And $dbBase Then
 			SetLog(_PadStringCenter(" Dead Base Found! ", 50, "~"), $COLOR_GREEN)
 			$iMatchMode = $DB
@@ -178,6 +227,7 @@ Func VillageSearch() ;Control for searching a village that meets conditions
 			EndIf
 		EndIf
 		If $bBtnAttackNowPressed = True Then ExitLoop
+	    If $debugSetlog = 1 Then SetLog(_PadStringCenter(" Click Next ", 50, "~"), $COLOR_GREEN)
 		Click(825, 527,1,0,"#0155") ;Click Next
 		If _Sleep(500) Then Return
 		If isGemOpen(True) = True Then
@@ -189,6 +239,9 @@ Func VillageSearch() ;Control for searching a village that meets conditions
 		$iSkipped = $iSkipped + 1
 		GUICtrlSetData($lblresultvillagesskipped, GUICtrlRead($lblresultvillagesskipped) + 1)
 	WEnd
+
+    ; Close DLL
+    DllClose($pFunctionDLL)
 
 	If $bBtnAttackNowPressed = True Then
 		Setlog(_PadStringCenter(" Attack Now Pressed! ", 50, "~"), $COLOR_GREEN)
